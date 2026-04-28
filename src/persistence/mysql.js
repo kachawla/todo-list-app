@@ -13,13 +13,24 @@ const {
     MYSQL_DB_FILE: DB_FILE,
 } = process.env;
 
+function getConnProp(connName, prop) {
+    const propsJson = process.env[`CONNECTION_${connName}_PROPERTIES`];
+    if (propsJson) {
+        try {
+            const props = JSON.parse(propsJson);
+            return props[prop.toLowerCase()] || '';
+        } catch (e) { console.error('Failed to parse CONNECTION properties JSON:', e); }
+    }
+    return process.env[`CONNECTION_${connName}_${prop}`] || '';
+}
+
 let pool;
 
 async function init() {
-    const host = HOST_FILE ? fs.readFileSync(HOST_FILE) : HOST;
-    const user = USER_FILE ? fs.readFileSync(USER_FILE) : USER;
-    const password = PASSWORD_FILE ? fs.readFileSync(PASSWORD_FILE) : PASSWORD;
-    const database = DB_FILE ? fs.readFileSync(DB_FILE) : DB;
+    const host = HOST_FILE ? fs.readFileSync(HOST_FILE) : (HOST || getConnProp('MYSQLDB', 'HOST'));
+    const user = USER_FILE ? fs.readFileSync(USER_FILE) : (USER || getConnProp('MYSQLDB', 'USERNAME'));
+    const password = PASSWORD_FILE ? fs.readFileSync(PASSWORD_FILE) : (PASSWORD || getConnProp('MYSQLDB', 'PASSWORD'));
+    const database = DB_FILE ? fs.readFileSync(DB_FILE) : (DB || getConnProp('MYSQLDB', 'DATABASE'));
 
     await waitPort({ 
         host, 
