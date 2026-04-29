@@ -6,6 +6,7 @@ extension radiusData 'br:biceptypes.azurecr.io/radiusdata:latest'
 param environment string
 @secure()
 param password string
+@description('The full container image reference to build and push. Must be lowercase.')
 param image string
 
 resource todoApp 'Applications.Core/applications@2023-10-01-preview' = {
@@ -22,7 +23,6 @@ resource database 'Radius.Data/mySqlDatabases@2025-08-01-preview' = {
     environment: environment
     database: 'todos'
     version: '8.0'
-    username: 'todo_list_app_user'
     secretName: dbSecret.name
   }
 }
@@ -33,8 +33,12 @@ resource dbSecret 'Radius.Security/secrets@2025-08-01-preview' = {
     application: todoApp.id
     environment: environment
     data: {
-      username: 'todo_list_app_user'
-      password: password
+      USERNAME: {
+        value: 'todo_list_app_user'
+      }
+      PASSWORD: {
+        value: password
+      }
     }
   }
 }
