@@ -120,7 +120,7 @@ jobs:
           echo "EKS kubeconfig saved with static token"
 
       - name: Set up control plane
-        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@6baf1d0a423e47515abbe31c5a9ccc78d3227218
+        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@6a8bc7c7256d355720aaf9af0cec2dab9b17cdd2
 
       - name: Project cloud OIDC tokens into Radius pods
         env:
@@ -177,9 +177,16 @@ jobs:
 
       - name: Restore Radius state
         id: restore-state
-        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@6baf1d0a423e47515abbe31c5a9ccc78d3227218
+        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@6a8bc7c7256d355720aaf9af0cec2dab9b17cdd2
         with:
           namespace: ${{ vars.KUBERNETES_NAMESPACE || 'default' }}
+
+      - name: Write recipe registry secret
+        uses: radius-project/ai-extensions/.github/extension/actions/aws-recipe-registry-secret@6a8bc7c7256d355720aaf9af0cec2dab9b17cdd2
+        with:
+          namespace: ${{ vars.KUBERNETES_NAMESPACE || 'default' }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Register cloud credentials with Radius
         env:
@@ -265,13 +272,13 @@ jobs:
           echo "✅ No applications are deployed to environment '${RESOURCE_NAME}'; safe to delete."
 
       - name: Delete Radius resource
-        uses: radius-project/ai-extensions/.github/extension/actions/delete-resource@6baf1d0a423e47515abbe31c5a9ccc78d3227218
+        uses: radius-project/ai-extensions/.github/extension/actions/delete-resource@6a8bc7c7256d355720aaf9af0cec2dab9b17cdd2
         with:
           resource-type: ${{ inputs.resource_type }}
           name: ${{ inputs.name }}
 
       - name: Teardown
         if: always()
-        uses: radius-project/ai-extensions/.github/extension/actions/teardown@6baf1d0a423e47515abbe31c5a9ccc78d3227218
+        uses: radius-project/ai-extensions/.github/extension/actions/teardown@6a8bc7c7256d355720aaf9af0cec2dab9b17cdd2
         with:
           state-restored: ${{ steps.restore-state.outputs.state-restored }}
