@@ -123,7 +123,7 @@ jobs:
             --file "$RADIUS_TARGET_KUBECONFIG"
 
       - name: Set up control plane
-        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@55ec9efccc7e3345fa3241e3b918b59d8f8986db
+        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@15b4a6b6bc79bc953e581ba79bc56972f7715f7c
 
       - name: Project cloud OIDC tokens into Radius pods
         env:
@@ -186,7 +186,7 @@ jobs:
 
       - name: Restore Radius state
         id: restore-state
-        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@55ec9efccc7e3345fa3241e3b918b59d8f8986db
+        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@15b4a6b6bc79bc953e581ba79bc56972f7715f7c
         with:
           namespace: ${{ vars.KUBERNETES_NAMESPACE || 'default' }}
 
@@ -209,7 +209,7 @@ jobs:
           echo "✅ Cloud credentials registered with Radius."
 
       - name: Delete Radius resource
-        uses: radius-project/ai-extensions/.github/extension/actions/delete-resource@55ec9efccc7e3345fa3241e3b918b59d8f8986db
+        uses: radius-project/ai-extensions/.github/extension/actions/delete-resource@15b4a6b6bc79bc953e581ba79bc56972f7715f7c
         with:
           resource-type: ${{ inputs.resource_type }}
           name: ${{ inputs.name }}
@@ -218,7 +218,7 @@ jobs:
 
       - name: Discard the deleted application's deployed graph
         if: ${{ inputs.resource_type == 'application' }}
-        uses: radius-project/ai-extensions/.github/extension/actions/discard-deploy-status@55ec9efccc7e3345fa3241e3b918b59d8f8986db
+        uses: radius-project/ai-extensions/.github/extension/actions/discard-deploy-status@15b4a6b6bc79bc953e581ba79bc56972f7715f7c
         with:
           environment: ${{ inputs.environment }}
           application: ${{ inputs.name }}
@@ -226,7 +226,7 @@ jobs:
 
       - name: Clean up unused routes Gateway infrastructure
         if: ${{ inputs.resource_type == 'application' }}
-        uses: radius-project/ai-extensions/.github/extension/actions/manage-routes-gateway@55ec9efccc7e3345fa3241e3b918b59d8f8986db
+        uses: radius-project/ai-extensions/.github/extension/actions/manage-routes-gateway@15b4a6b6bc79bc953e581ba79bc56972f7715f7c
         with:
           mode: cleanup
           target-kubeconfig: ${{ env.RADIUS_TARGET_KUBECONFIG }}
@@ -239,6 +239,6 @@ jobs:
 
       - name: Teardown
         if: always()
-        uses: radius-project/ai-extensions/.github/extension/actions/teardown@55ec9efccc7e3345fa3241e3b918b59d8f8986db
+        uses: radius-project/ai-extensions/.github/extension/actions/teardown@15b4a6b6bc79bc953e581ba79bc56972f7715f7c
         with:
           state-restored: ${{ steps.restore-state.outputs.state-restored }}
