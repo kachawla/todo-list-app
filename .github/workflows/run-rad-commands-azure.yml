@@ -127,10 +127,10 @@ jobs:
             --file "$RADIUS_TARGET_KUBECONFIG"
 
       - name: Set up control plane
-        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@2ae04197002ac29df5f354ba1030897199d8a0ae
+        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@55ec9efccc7e3345fa3241e3b918b59d8f8986db
 
       - name: Load Radius contrib catalog
-        uses: radius-project/ai-extensions/.github/extension/actions/load-contrib-catalog@2ae04197002ac29df5f354ba1030897199d8a0ae
+        uses: radius-project/ai-extensions/.github/extension/actions/load-contrib-catalog@55ec9efccc7e3345fa3241e3b918b59d8f8986db
 
       - name: Project cloud OIDC tokens into Radius pods
         env:
@@ -216,7 +216,7 @@ jobs:
 
       - name: Restore Radius state
         id: restore-state
-        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@2ae04197002ac29df5f354ba1030897199d8a0ae
+        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@55ec9efccc7e3345fa3241e3b918b59d8f8986db
         with:
           namespace: ${{ vars.KUBERNETES_NAMESPACE || 'default' }}
 
@@ -413,20 +413,20 @@ jobs:
           echo "provider-pack=${PACK_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Attach provider recipe pack
-        uses: radius-project/ai-extensions/.github/extension/actions/attach-recipe-pack@2ae04197002ac29df5f354ba1030897199d8a0ae
+        uses: radius-project/ai-extensions/.github/extension/actions/attach-recipe-pack@55ec9efccc7e3345fa3241e3b918b59d8f8986db
         with:
           environment: ${{ inputs.environment }}
           recipe-pack: ${{ steps.provider-setup.outputs.provider-pack }}
           remove-default-recipe-pack: "true"
 
       - name: Apply custom recipe packs
-        uses: radius-project/ai-extensions/.github/extension/actions/apply-custom-recipe-packs@2ae04197002ac29df5f354ba1030897199d8a0ae
+        uses: radius-project/ai-extensions/.github/extension/actions/apply-custom-recipe-packs@55ec9efccc7e3345fa3241e3b918b59d8f8986db
         with:
           environment: ${{ inputs.environment }}
           app-file: ${{ env.APP_FILE }}
 
       - name: Ensure routes Gateway infrastructure
-        uses: radius-project/ai-extensions/.github/extension/actions/manage-routes-gateway@2ae04197002ac29df5f354ba1030897199d8a0ae
+        uses: radius-project/ai-extensions/.github/extension/actions/manage-routes-gateway@55ec9efccc7e3345fa3241e3b918b59d8f8986db
         with:
           mode: ensure
           target-kubeconfig: ${{ env.RADIUS_TARGET_KUBECONFIG }}
@@ -438,10 +438,10 @@ jobs:
           exposure: ${{ vars.RADIUS_ROUTES_EXPOSURE }}
 
       - name: Prepare live deployment progress
-        uses: radius-project/ai-extensions/.github/extension/actions/deploy-progress/artifact-uploader@2ae04197002ac29df5f354ba1030897199d8a0ae
+        uses: radius-project/ai-extensions/.github/extension/actions/deploy-progress/artifact-uploader@55ec9efccc7e3345fa3241e3b918b59d8f8986db
 
       - name: Run rad commands
-        uses: radius-project/ai-extensions/.github/extension/actions/run-rad-commands@2ae04197002ac29df5f354ba1030897199d8a0ae
+        uses: radius-project/ai-extensions/.github/extension/actions/run-rad-commands@55ec9efccc7e3345fa3241e3b918b59d8f8986db
         with:
           environment: ${{ inputs.environment }}
           app-file: ${{ env.APP_FILE }}
@@ -461,13 +461,13 @@ jobs:
       # cancellation, where the control plane is already being torn down.
       - name: Publish deployed graph and status
         if: ${{ !cancelled() }}
-        uses: radius-project/ai-extensions/.github/extension/actions/publish-deploy-status@2ae04197002ac29df5f354ba1030897199d8a0ae
+        uses: radius-project/ai-extensions/.github/extension/actions/publish-deploy-status@55ec9efccc7e3345fa3241e3b918b59d8f8986db
         with:
           environment: ${{ inputs.environment }}
           app-file: ${{ env.APP_FILE }}
 
       - name: Teardown
         if: always()
-        uses: radius-project/ai-extensions/.github/extension/actions/teardown@2ae04197002ac29df5f354ba1030897199d8a0ae
+        uses: radius-project/ai-extensions/.github/extension/actions/teardown@55ec9efccc7e3345fa3241e3b918b59d8f8986db
         with:
           state-restored: ${{ steps.restore-state.outputs.state-restored }}
