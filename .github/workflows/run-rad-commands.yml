@@ -16,7 +16,7 @@ on:
       environment:
         description: 'GitHub Environment name'
         required: true
-        default: 'aws-dev'
+        default: 'aws-demo'
       image:
         description: 'Container image passed only when the application template declares the image parameter'
         required: false
@@ -46,7 +46,7 @@ jobs:
   detect:
     name: Detect provider
     runs-on: ubuntu-24.04
-    environment: ${{ inputs.environment || 'aws-dev' }}
+    environment: ${{ inputs.environment || 'aws-demo' }}
     outputs:
       provider: ${{ steps.detect.outputs.provider }}
     steps:
@@ -76,7 +76,7 @@ jobs:
     if: ${{ needs.detect.outputs.provider == 'azure' }}
     uses: ./.github/workflows/run-rad-commands-azure.yml
     with:
-      environment: ${{ inputs.environment || 'aws-dev' }}
+      environment: ${{ inputs.environment || 'aws-demo' }}
       image: ${{ inputs.image }}
       rad_commands: ${{ inputs.rad_commands }}
     secrets: inherit
@@ -87,7 +87,7 @@ jobs:
     if: ${{ needs.detect.outputs.provider == 'aws' }}
     uses: ./.github/workflows/run-rad-commands-aws.yml
     with:
-      environment: ${{ inputs.environment || 'aws-dev' }}
+      environment: ${{ inputs.environment || 'aws-demo' }}
       image: ${{ inputs.image }}
       rad_commands: ${{ inputs.rad_commands }}
     secrets: inherit
