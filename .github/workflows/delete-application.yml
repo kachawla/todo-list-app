@@ -14,7 +14,7 @@ on:
       environment:
         description: 'GitHub Environment name'
         required: true
-        default: 'aws-dev'
+        default: 'aws-demo'
       application:
         description: 'Name of the application to delete'
         required: true
@@ -41,7 +41,7 @@ jobs:
   detect:
     name: Detect provider
     runs-on: ubuntu-24.04
-    environment: ${{ inputs.environment || 'aws-dev' }}
+    environment: ${{ inputs.environment || 'aws-demo' }}
     outputs:
       provider: ${{ steps.detect.outputs.provider }}
     steps:
@@ -71,14 +71,14 @@ jobs:
     if: ${{ needs.detect.outputs.provider == 'azure' }}
     uses: ./.github/workflows/delete-azure.yml
     with:
-      environment: ${{ inputs.environment || 'aws-dev' }}
+      environment: ${{ inputs.environment || 'aws-demo' }}
       resource_type: application
       name: ${{ inputs.application }}
-      # A workflow_dispatch boolean input arrives as the string "true"/"false",
-      # including its default, but delete-azure.yml/delete-aws.yml declare `force`
-      # as `type: boolean`. Compare to coerce it, so every delete (forced or not)
-      # passes a real boolean. See actions/runner#1483.
-      force: ${{ inputs.force == 'true' }}
+      # The `inputs` context keeps a dispatch boolean as a boolean, while older
+      # runners and `github.event.inputs` carry the string "true"/"false"
+      # (actions/runner#1483). delete-azure.yml/delete-aws.yml declare `force`
+      # as `type: boolean`, so accept both forms and always pass a boolean.
+      force: ${{ inputs.force == true || inputs.force == 'true' }}
     secrets: inherit
 
   aws:
@@ -87,12 +87,12 @@ jobs:
     if: ${{ needs.detect.outputs.provider == 'aws' }}
     uses: ./.github/workflows/delete-aws.yml
     with:
-      environment: ${{ inputs.environment || 'aws-dev' }}
+      environment: ${{ inputs.environment || 'aws-demo' }}
       resource_type: application
       name: ${{ inputs.application }}
-      # A workflow_dispatch boolean input arrives as the string "true"/"false",
-      # including its default, but delete-azure.yml/delete-aws.yml declare `force`
-      # as `type: boolean`. Compare to coerce it, so every delete (forced or not)
-      # passes a real boolean. See actions/runner#1483.
-      force: ${{ inputs.force == 'true' }}
+      # The `inputs` context keeps a dispatch boolean as a boolean, while older
+      # runners and `github.event.inputs` carry the string "true"/"false"
+      # (actions/runner#1483). delete-azure.yml/delete-aws.yml declare `force`
+      # as `type: boolean`, so accept both forms and always pass a boolean.
+      force: ${{ inputs.force == true || inputs.force == 'true' }}
     secrets: inherit
