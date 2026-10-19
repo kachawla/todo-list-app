@@ -32,18 +32,6 @@ resource mysqlDb 'Radius.Data/mySqlDatabases@2025-08-01-preview' = {
   }
 }
 
-resource brokenDb 'Radius.Data/mySqlDatabases@2025-08-01-preview' = {
-  name: 'brokendb'
-  properties: {
-    environment: environment
-    application: todoApp.id
-    database: 'bad-name'
-    password: mysqlPassword
-    username: 'myadmin'
-    version: '8.0'
-  }
-}
-
 resource mysqlClientCredentials 'Radius.Security/secrets@2025-08-01-preview' = {
   name: 'mysql-client-credentials'
   properties: {
