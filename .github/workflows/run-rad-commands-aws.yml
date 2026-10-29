@@ -154,10 +154,10 @@ jobs:
           kubectl --kubeconfig "$TARGET" cluster-info || echo "WARNING: Could not connect to EKS cluster"
 
       - name: Set up control plane
-        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@e73066b9a62f543a574f8dc5b570444120ba3170
+        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@6b31143d5dcf053eff3513d8016b4150477ceedd
 
       - name: Load Radius contrib catalog
-        uses: radius-project/ai-extensions/.github/extension/actions/load-contrib-catalog@e73066b9a62f543a574f8dc5b570444120ba3170
+        uses: radius-project/ai-extensions/.github/extension/actions/load-contrib-catalog@6b31143d5dcf053eff3513d8016b4150477ceedd
 
       - name: Project cloud OIDC tokens into Radius pods
         run: |
@@ -243,7 +243,7 @@ jobs:
 
       - name: Restore Radius state
         id: restore-state
-        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@e73066b9a62f543a574f8dc5b570444120ba3170
+        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@6b31143d5dcf053eff3513d8016b4150477ceedd
         with:
           namespace: ${{ vars.KUBERNETES_NAMESPACE || 'default' }}
 
@@ -285,6 +285,10 @@ jobs:
           # the same Radius ref as this generated workflow.
           source "$RADIUS_CONTRIB_CATALOG_HELPER"
           NAMESPACE="$KUBERNETES_NAMESPACE"
+          # LIVE TEST ONLY: read the aws-eks pack from the catalog.
+          RECIPE_PACK_URL="$(radius_contrib_recipe_pack_url aws-eks aws-eks.bicep)"
+          RECIPE_PACK_REF="$(radius_contrib_catalog_field recipePacks aws-eks ref)"
+          echo "Recipe pack from the catalog: $RECIPE_PACK_URL"
 
           # These values are written into Bicep below, so refuse anything that is
           # not the shape the environment setup records.
@@ -458,20 +462,20 @@ jobs:
           echo "provider-pack=${PACK_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Attach provider recipe pack
-        uses: radius-project/ai-extensions/.github/extension/actions/attach-recipe-pack@e73066b9a62f543a574f8dc5b570444120ba3170
+        uses: radius-project/ai-extensions/.github/extension/actions/attach-recipe-pack@6b31143d5dcf053eff3513d8016b4150477ceedd
         with:
           environment: ${{ inputs.environment }}
           recipe-pack: ${{ steps.provider-setup.outputs.provider-pack }}
           remove-default-recipe-pack: "true"
 
       - name: Apply custom recipe packs
-        uses: radius-project/ai-extensions/.github/extension/actions/apply-custom-recipe-packs@e73066b9a62f543a574f8dc5b570444120ba3170
+        uses: radius-project/ai-extensions/.github/extension/actions/apply-custom-recipe-packs@6b31143d5dcf053eff3513d8016b4150477ceedd
         with:
           environment: ${{ inputs.environment }}
           app-file: ${{ env.APP_FILE }}
 
       - name: Ensure routes Gateway infrastructure
-        uses: radius-project/ai-extensions/.github/extension/actions/manage-routes-gateway@e73066b9a62f543a574f8dc5b570444120ba3170
+        uses: radius-project/ai-extensions/.github/extension/actions/manage-routes-gateway@6b31143d5dcf053eff3513d8016b4150477ceedd
         with:
           mode: ensure
           target-kubeconfig: ${{ env.RADIUS_TARGET_KUBECONFIG }}
@@ -483,10 +487,10 @@ jobs:
           exposure: ${{ vars.RADIUS_ROUTES_EXPOSURE }}
 
       - name: Prepare live deployment progress
-        uses: radius-project/ai-extensions/.github/extension/actions/deploy-progress/artifact-uploader@e73066b9a62f543a574f8dc5b570444120ba3170
+        uses: radius-project/ai-extensions/.github/extension/actions/deploy-progress/artifact-uploader@6b31143d5dcf053eff3513d8016b4150477ceedd
 
       - name: Run rad commands
-        uses: radius-project/ai-extensions/.github/extension/actions/run-rad-commands@e73066b9a62f543a574f8dc5b570444120ba3170
+        uses: radius-project/ai-extensions/.github/extension/actions/run-rad-commands@6b31143d5dcf053eff3513d8016b4150477ceedd
         with:
           environment: ${{ inputs.environment }}
           app-file: ${{ env.APP_FILE }}
@@ -505,13 +509,48 @@ jobs:
       # cancellation, where the control plane is already being torn down.
       - name: Publish deployed graph and status
         if: ${{ !cancelled() }}
-        uses: radius-project/ai-extensions/.github/extension/actions/publish-deploy-status@e73066b9a62f543a574f8dc5b570444120ba3170
+        uses: radius-project/ai-extensions/.github/extension/actions/publish-deploy-status@6b31143d5dcf053eff3513d8016b4150477ceedd
         with:
           environment: ${{ inputs.environment }}
           app-file: ${{ env.APP_FILE }}
 
+      # LIVE TEST ONLY: count the test password in UCP's AWS responses
+      # (radius-project/radius#13457). Prints counts, never values.
+      - name: Probe AWS responses for the test password
+        if: ${{ !cancelled() }}
+        env:
+          DEPLOY_PARAMS: ${{ secrets.RADIUS_DEPLOY_PARAMS }}
+        run: |
+          set -uo pipefail
+          password="$(printf '%s' "$DEPLOY_PARAMS" | jq -r '.mysqlPassword // empty')"
+          if [ -z "$password" ]; then echo "PROBE: no mysqlPassword"; exit 0; fi
+          echo "::add-mask::$password"
+          hits() { grep -oF -- "$password" | wc -l | tr -d ' '; }
+          keys() { grep -o MasterUserPassword | wc -l | tr -d ' '; }
+          ucp=/apis/api.ucp.dev/v1alpha3
+          rg=/planes/radius/local/resourcegroups/default
+          kc() { kubectl --context k3d-radius-cp "$@"; }
+          echo "PROBE: rad $(rad version 2>&1 | tail -1)"
+          deps="$(kc get --raw "$ucp$rg/providers/Microsoft.Resources/deployments?api-version=2020-10-01" 2>&1)"
+          echo "PROBE: list deployments rc=$? count=$(printf '%s' "$deps" | jq '.value | length' 2>/dev/null)"
+          for name in $(printf '%s' "$deps" | jq -r '.value[]?.name' 2>/dev/null); do
+            ops="$(kc get --raw "$ucp$rg/providers/Microsoft.Resources/deployments/$name/operations?api-version=2020-10-01" 2>&1)"
+            rc=$?
+            echo "PROBE: deployment $name operations rc=$rc bytes=${#ops} rds=$(printf '%s' "$ops" | grep -o 'AWS.RDS/DBInstance' | wc -l | tr -d ' ') responses=$(printf '%s' "$ops" | grep -o '"DBInstanceArn"' | wc -l | tr -d ' ') MasterUserPassword=$(printf '%s' "$ops" | keys) pw_hits=$(printf '%s' "$ops" | hits)"
+          done
+          id="$(rad resource list Radius.Data/mySqlDatabases -o json 2>/dev/null | jq -r '.[]?.properties.status.outputResources[]?.id | select(test("AWS.RDS/DBInstance"))' | head -1)"
+          echo "PROBE: RDS resource ${id:-not found}"
+          [ -n "$id" ] || exit 0
+          current="$(kc get --raw "$ucp$id?api-version=default" 2>&1)"
+          echo "PROBE: GET rc=$? MasterUserPassword=$(printf '%s' "$current" | keys) pw_hits=$(printf '%s' "$current" | hits)"
+          body="$(printf '%s' "$current" | jq -c --arg p "$password" '{properties: (.properties + {MasterUserPassword: $p})}')"
+          response="$(printf '%s' "$body" | kc replace --raw "$ucp$id?api-version=default" -f - 2>&1)"
+          rc=$?
+          echo "PROBE: PUT with the password rc=$rc bytes=${#response} DBInstanceArn=$(printf '%s' "$response" | grep -o '"DBInstanceArn"' | wc -l | tr -d ' ') MasterUserPassword=$(printf '%s' "$response" | keys) pw_hits=$(printf '%s' "$response" | hits)"
+          if [ "$rc" -ne 0 ]; then printf '%s\n' "$response" | head -c 800; echo; fi
+
       - name: Teardown
         if: always()
-        uses: radius-project/ai-extensions/.github/extension/actions/teardown@e73066b9a62f543a574f8dc5b570444120ba3170
+        uses: radius-project/ai-extensions/.github/extension/actions/teardown@6b31143d5dcf053eff3513d8016b4150477ceedd
         with:
           state-restored: ${{ steps.restore-state.outputs.state-restored }}
