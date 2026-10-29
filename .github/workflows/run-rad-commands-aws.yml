@@ -154,10 +154,10 @@ jobs:
           kubectl --kubeconfig "$TARGET" cluster-info || echo "WARNING: Could not connect to EKS cluster"
 
       - name: Set up control plane
-        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@77fd437891db4f8bad8baf2302e42911dc60b565
+        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@73c4c0785778594329275bb4cd7d2c6712cdcb0b
 
       - name: Load Radius contrib catalog
-        uses: radius-project/ai-extensions/.github/extension/actions/load-contrib-catalog@77fd437891db4f8bad8baf2302e42911dc60b565
+        uses: radius-project/ai-extensions/.github/extension/actions/load-contrib-catalog@73c4c0785778594329275bb4cd7d2c6712cdcb0b
 
       - name: Project cloud OIDC tokens into Radius pods
         run: |
@@ -243,7 +243,7 @@ jobs:
 
       - name: Restore Radius state
         id: restore-state
-        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@77fd437891db4f8bad8baf2302e42911dc60b565
+        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@73c4c0785778594329275bb4cd7d2c6712cdcb0b
         with:
           namespace: ${{ vars.KUBERNETES_NAMESPACE || 'default' }}
 
@@ -462,20 +462,20 @@ jobs:
           echo "provider-pack=${PACK_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Attach provider recipe pack
-        uses: radius-project/ai-extensions/.github/extension/actions/attach-recipe-pack@77fd437891db4f8bad8baf2302e42911dc60b565
+        uses: radius-project/ai-extensions/.github/extension/actions/attach-recipe-pack@73c4c0785778594329275bb4cd7d2c6712cdcb0b
         with:
           environment: ${{ inputs.environment }}
           recipe-pack: ${{ steps.provider-setup.outputs.provider-pack }}
           remove-default-recipe-pack: "true"
 
       - name: Apply custom recipe packs
-        uses: radius-project/ai-extensions/.github/extension/actions/apply-custom-recipe-packs@77fd437891db4f8bad8baf2302e42911dc60b565
+        uses: radius-project/ai-extensions/.github/extension/actions/apply-custom-recipe-packs@73c4c0785778594329275bb4cd7d2c6712cdcb0b
         with:
           environment: ${{ inputs.environment }}
           app-file: ${{ env.APP_FILE }}
 
       - name: Ensure routes Gateway infrastructure
-        uses: radius-project/ai-extensions/.github/extension/actions/manage-routes-gateway@77fd437891db4f8bad8baf2302e42911dc60b565
+        uses: radius-project/ai-extensions/.github/extension/actions/manage-routes-gateway@73c4c0785778594329275bb4cd7d2c6712cdcb0b
         with:
           mode: ensure
           target-kubeconfig: ${{ env.RADIUS_TARGET_KUBECONFIG }}
@@ -487,10 +487,10 @@ jobs:
           exposure: ${{ vars.RADIUS_ROUTES_EXPOSURE }}
 
       - name: Prepare live deployment progress
-        uses: radius-project/ai-extensions/.github/extension/actions/deploy-progress/artifact-uploader@77fd437891db4f8bad8baf2302e42911dc60b565
+        uses: radius-project/ai-extensions/.github/extension/actions/deploy-progress/artifact-uploader@73c4c0785778594329275bb4cd7d2c6712cdcb0b
 
       - name: Run rad commands
-        uses: radius-project/ai-extensions/.github/extension/actions/run-rad-commands@77fd437891db4f8bad8baf2302e42911dc60b565
+        uses: radius-project/ai-extensions/.github/extension/actions/run-rad-commands@73c4c0785778594329275bb4cd7d2c6712cdcb0b
         with:
           environment: ${{ inputs.environment }}
           app-file: ${{ env.APP_FILE }}
@@ -509,7 +509,7 @@ jobs:
       # cancellation, where the control plane is already being torn down.
       - name: Publish deployed graph and status
         if: ${{ !cancelled() }}
-        uses: radius-project/ai-extensions/.github/extension/actions/publish-deploy-status@77fd437891db4f8bad8baf2302e42911dc60b565
+        uses: radius-project/ai-extensions/.github/extension/actions/publish-deploy-status@73c4c0785778594329275bb4cd7d2c6712cdcb0b
         with:
           environment: ${{ inputs.environment }}
           app-file: ${{ env.APP_FILE }}
@@ -544,15 +544,27 @@ jobs:
           echo "PROBE: RDS resource ${id:-not found}"
           [ -n "$id" ] || exit 0
           current="$(kc get --raw "$ucp$id?api-version=default" 2>&1)"
-          echo "PROBE: GET rc=$? MasterUserPassword=$(printf '%s' "$current" | keys) pw_hits=$(printf '%s' "$current" | hits)"
-          body="$(printf '%s' "$current" | jq -c --arg p "$password" '{properties: (.properties + {MasterUserPassword: $p})}')"
-          response="$(printf '%s' "$body" | kc replace --raw "$ucp$id?api-version=default" -f - 2>&1)"
-          rc=$?
-          echo "PROBE: PUT with the password rc=$rc bytes=${#response} DBInstanceArn=$(printf '%s' "$response" | grep -o '"DBInstanceArn"' | wc -l | tr -d ' ') MasterUserPassword=$(printf '%s' "$response" | keys) pw_hits=$(printf '%s' "$response" | hits)"
-          if [ "$rc" -ne 0 ]; then printf '%s\n' "$response" | head -c 800; echo; fi
+          echo "PROBE: GET rc=$? pw_hits=$(printf '%s' "$current" | hits) MasterUserPassword-shape=$(printf '%s' "$current" | jq -c '.properties.MasterUserPassword | [type, (tostring | length)]' 2>/dev/null)"
+          kc proxy --port 8099 >/dev/null 2>&1 &
+          proxy=$!
+          sleep 3
+          url="http://127.0.0.1:8099$ucp$id?api-version=default"
+          marker="probe-$(openssl rand -hex 6)"
+          put() {
+            local label="$1" body="$2" out status
+            out="$(mktemp)"
+            status="$(printf '%s' "$body" | curl -s -o "$out" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data-binary @- "$url")"
+            echo "PROBE: PUT $label status=$status bytes=$(wc -c < "$out" | tr -d ' ') marker=$(grep -oF -- "$marker" "$out" | wc -l | tr -d ' ') MasterUserPassword=$(keys < "$out") pw_hits=$(hits < "$out") MasterUserPassword-shape=$(jq -c '.properties.MasterUserPassword | [type, (tostring | length)]' "$out" 2>/dev/null)"
+            rm -f "$out"
+          }
+          base="$(printf '%s' "$current" | jq -c '.properties | del(.MasterUserPassword)')"
+          put "same properties, no password" "$(jq -nc --argjson p "$base" '{properties: $p}')"
+          put "password plus a marker tag" "$(jq -nc --argjson p "$base" --arg pw "$password" --arg m "$marker" '{properties: ($p + {MasterUserPassword: $pw, Tags: (($p.Tags // []) + [{Key: "radius-live-probe", Value: $m}])})}')"
+          put "same password and tag again" "$(jq -nc --argjson p "$base" --arg pw "$password" --arg m "$marker" '{properties: ($p + {MasterUserPassword: $pw, Tags: (($p.Tags // []) + [{Key: "radius-live-probe", Value: $m}])})}')"
+          kill "$proxy" 2>/dev/null
 
       - name: Teardown
         if: always()
-        uses: radius-project/ai-extensions/.github/extension/actions/teardown@77fd437891db4f8bad8baf2302e42911dc60b565
+        uses: radius-project/ai-extensions/.github/extension/actions/teardown@73c4c0785778594329275bb4cd7d2c6712cdcb0b
         with:
           state-restored: ${{ steps.restore-state.outputs.state-restored }}
