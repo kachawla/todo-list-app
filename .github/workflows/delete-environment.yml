@@ -4,7 +4,7 @@
 # provider (delete-environment-azure.yml) live here so the environment-delete
 # safety guard (refuse to delete an environment that still has deployed apps)
 # can be owned and reviewed in this repo. The extension commits both files
-# verbatim (only filling the awsedge dispatch default) into the target repo's
+# verbatim (only filling the aws-demo dispatch default) into the target repo's
 # .github/workflows/.
 #
 # It binds to the selected GitHub Environment so environment-scoped variables are
@@ -24,7 +24,7 @@ on:
       environment:
         description: 'GitHub Environment name'
         required: true
-        default: 'awsedge'
+        default: 'aws-demo'
       environment_name:
         description: 'Radius environment name to delete (defaults to the GitHub Environment name)'
         required: false
@@ -47,7 +47,7 @@ jobs:
   detect:
     name: Detect provider
     runs-on: ubuntu-24.04
-    environment: ${{ inputs.environment || 'awsedge' }}
+    environment: ${{ inputs.environment || 'aws-demo' }}
     outputs:
       provider: ${{ steps.detect.outputs.provider }}
     steps:
@@ -73,9 +73,9 @@ jobs:
     if: ${{ needs.detect.outputs.provider == 'azure' }}
     uses: ./.github/workflows/delete-environment-azure.yml
     with:
-      environment: ${{ inputs.environment || 'awsedge' }}
+      environment: ${{ inputs.environment || 'aws-demo' }}
       resource_type: environment
-      name: ${{ inputs.environment_name || inputs.environment || 'awsedge' }}
+      name: ${{ inputs.environment_name || inputs.environment || 'aws-demo' }}
     secrets: inherit
 
   aws:
@@ -84,7 +84,7 @@ jobs:
     if: ${{ needs.detect.outputs.provider == 'aws' }}
     uses: ./.github/workflows/delete-environment-aws.yml
     with:
-      environment: ${{ inputs.environment || 'awsedge' }}
+      environment: ${{ inputs.environment || 'aws-demo' }}
       resource_type: environment
-      name: ${{ inputs.environment_name || inputs.environment || 'awsedge' }}
+      name: ${{ inputs.environment_name || inputs.environment || 'aws-demo' }}
     secrets: inherit
