@@ -120,7 +120,7 @@ jobs:
           echo "EKS kubeconfig saved with static token"
 
       - name: Set up control plane
-        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@73c4c0785778594329275bb4cd7d2c6712cdcb0b
+        uses: radius-project/ai-extensions/.github/extension/actions/setup-control-plane@ac8db4177c958fad8c063458980af0373618f064
 
       - name: Project cloud OIDC tokens into Radius pods
         env:
@@ -153,9 +153,6 @@ jobs:
           echo "✅ Cloud OIDC tokens projected into Radius pods."
 
       - name: Refresh external deployment target credentials
-        env:
-          CLUSTER: ${{ vars.AWS_EKS_CLUSTER_NAME }}
-          REGION: ${{ vars.AWS_REGION }}
         run: |
           TARGET_KUBECONFIG="$RADIUS_TARGET_KUBECONFIG"
 
@@ -163,15 +160,6 @@ jobs:
             echo "No target kubeconfig found, resources are on the k3d control plane"
             exit 0
           fi
-
-          # An EKS token lasts 15 minutes, and the one minted when connecting to
-          # the cluster predates the control-plane install and rollouts. Mint a
-          # fresh one right before the delete, as the application delete does.
-          echo "Generating fresh EKS token..."
-          ENDPOINT=$(aws eks describe-cluster --name "$CLUSTER" --region "$REGION" --query 'cluster.endpoint' --output text)
-          CA_DATA=$(aws eks describe-cluster --name "$CLUSTER" --region "$REGION" --query 'cluster.certificateAuthority.data' --output text)
-          TOKEN=$(aws eks get-token --cluster-name "$CLUSTER" --region "$REGION" --output json | jq -r '.status.token')
-          printf 'apiVersion: v1\nclusters:\n- cluster:\n    certificate-authority-data: %s\n    server: %s\n  name: eks\ncontexts:\n- context:\n    cluster: eks\n    user: eks-user\n  name: eks\ncurrent-context: eks\nkind: Config\nusers:\n- name: eks-user\n  user:\n    token: %s\n' "$CA_DATA" "$ENDPOINT" "$TOKEN" > "$TARGET_KUBECONFIG"
 
           # Update the secret the chart mounted at install with the refreshed
           # kubeconfig, then restart the recipe-executing pods so they re-read it.
@@ -189,9 +177,16 @@ jobs:
 
       - name: Restore Radius state
         id: restore-state
-        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@73c4c0785778594329275bb4cd7d2c6712cdcb0b
+        uses: radius-project/ai-extensions/.github/extension/actions/restore-state@ac8db4177c958fad8c063458980af0373618f064
         with:
           namespace: ${{ vars.KUBERNETES_NAMESPACE || 'default' }}
+
+      - name: Write recipe registry secret
+        uses: radius-project/ai-extensions/.github/extension/actions/aws-recipe-registry-secret@ac8db4177c958fad8c063458980af0373618f064
+        with:
+          namespace: ${{ vars.KUBERNETES_NAMESPACE || 'default' }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Register cloud credentials with Radius
         env:
@@ -208,9 +203,9 @@ jobs:
       # ai-extensions-owned safety guard (issue #303), split into two steps so a
       # listing failure cannot be mistaken for "no applications". This "List
       # applications" step must FAIL CLOSED: if `rad application list` errors
-      # (auth, state restore, control-plane) or returns anything other than one
-      # JSON array or null, we exit non-zero here. Radius 0.62 returns null for
-      # an empty list. This step is deliberately NOT the named guard step, so the
+      # (auth, state restore, control-plane) or returns anything other than a
+      # JSON array, we exit non-zero here instead of treating it as an empty
+      # environment. This step is deliberately NOT the named guard step, so the
       # canvas extension classifies a listing failure as a generic (retryable)
       # delete failure rather than "applications still deployed".
       - name: List applications in the environment
@@ -228,14 +223,8 @@ jobs:
             echo "::error::Could not list applications in environment '${RESOURCE_NAME}'. Refusing to delete the environment so a live application is not orphaned; check Radius connectivity and retry."
             exit 1
           fi
-          if ! apps_json="$(printf '%s' "$apps_json" | jq -sce '
-            if length != 1 then error("expected one JSON document")
-            elif .[0] == null then []
-            elif (.[0] | type) == "array" then .[0]
-            else error("expected an array or null")
-            end
-          ')"; then
-            echo "::error::'rad application list' did not return one JSON array or null for environment '${RESOURCE_NAME}'. Refusing to delete the environment; check Radius connectivity and retry."
+          if ! printf '%s' "$apps_json" | jq -e 'type == "array"' >/dev/null 2>&1; then
+            echo "::error::'rad application list' did not return a JSON array for environment '${RESOURCE_NAME}'. Refusing to delete the environment; check Radius connectivity and retry."
             exit 1
           fi
           app_count="$(printf '%s' "$apps_json" | jq 'length')"
@@ -283,13 +272,13 @@ jobs:
           echo "✅ No applications are deployed to environment '${RESOURCE_NAME}'; safe to delete."
 
       - name: Delete Radius resource
-        uses: radius-project/ai-extensions/.github/extension/actions/delete-resource@73c4c0785778594329275bb4cd7d2c6712cdcb0b
+        uses: radius-project/ai-extensions/.github/extension/actions/delete-resource@ac8db4177c958fad8c063458980af0373618f064
         with:
           resource-type: ${{ inputs.resource_type }}
           name: ${{ inputs.name }}
 
       - name: Teardown
         if: always()
-        uses: radius-project/ai-extensions/.github/extension/actions/teardown@73c4c0785778594329275bb4cd7d2c6712cdcb0b
+        uses: radius-project/ai-extensions/.github/extension/actions/teardown@ac8db4177c958fad8c063458980af0373618f064
         with:
           state-restored: ${{ steps.restore-state.outputs.state-restored }}
